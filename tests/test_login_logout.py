@@ -1,10 +1,5 @@
 import unittest
-
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
-
 from pages.login_page import LoginPage
 from pages.products_page import ProductsPage
 
@@ -22,31 +17,42 @@ class TestSauceDemoLoginLogout(unittest.TestCase):
     def tearDownClass(cls):
         cls.driver.quit()
 
-    def test_valid_login(self):
+    def setUp(self):
         self.driver.get('https://www.saucedemo.com/')
+
+    def test_valid_login(self):
         self.login_page.login('standard_user', 'secret_sauce')
         products_title = self.products_page.get_products_title()
         self.assertEqual(products_title, 'Products', msg="Valid login failed, 'Products' title not found.")
+        self.assertTrue(self.products_page.is_logout_option_available(), msg="Logout option not available.")
 
     def test_invalid_login(self):
-        self.driver.get('https://www.saucedemo.com/')
         self.login_page.login('invalid_username', 'invalid_password')
-        error_message = self.driver.find_element(By.CSS_SELECTOR, 'h3[data-test="error"]').text
-        self.assertEqual(error_message, 'Epic sadface: Username and password do not match any user in this service', msg="Invalid login failed, error message mismatch or not found.")
+        error_message = self.login_page.get_error_message()
+        self.assertEqual(error_message, 'Epic sadface: Username and password do not match any user in this service',
+                         msg="Invalid login failed, error message mismatch or not found.")
 
-    def test_logout(self):
+    def test_empty_username(self):
+        self.login_page.login('', 'secret_sauce')
+        error_message = self.login_page.get_error_message()
+        self.assertEqual(error_message, 'Epic sadface: Username is required', msg="Error message mismatch.")
+
+    def test_empty_password(self):
+        self.login_page.login('standard_user', '')
+        error_message = self.login_page.get_error_message()
+        self.assertEqual(error_message, 'Epic sadface: Password is required', msg="Password message mismatch.")
+
+    def test_wrong_username_correct_password(self):
         self.driver.get('https://www.saucedemo.com/')
-        self.login_page.login('standard_user', 'secret_sauce')
-        self.products_page.open_burger_menu()
-        self.products_page.logout()
+        self.login_page.login('wrong_username', 'secret_sauce')
+        error_message = self.login_page.get_error_message()
+        self.assertEqual(error_message, 'Epic sadface: Username and password do not match any user in this service',
+                         msg="Invalid login failed, error message mismatch or not found.")
 
-        WebDriverWait(self.driver, 10).until(
-            ec.visibility_of_element_located((By.ID, 'login-button'))
-        )
+        def test_logout(self):
+            self.login_page.login('standard_user', 'secret_sauce')
+            self.products_page.logout()
+            self.assertTrue(self.login_page.is_login_button_visible(), msg="Login button is not visible after logout.")
 
-        login_button_text = self.driver.find_element(By.ID, 'login-button').get_attribute('value')
-        self.assertEqual(login_button_text, 'Login', msg="Logout failed, 'Login' button text not found.")
-
-
-if __name__ == '__main__':
-    unittest.main()
+    if __name__ == '__main__':
+        unittest.main()
